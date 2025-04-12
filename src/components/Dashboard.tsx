@@ -4,9 +4,7 @@ import { Separator } from '@/components/ui/separator';
 import { LogOut } from 'lucide-react';
 import { useWordPress } from '@/hooks/useWordPress';
 import { 
-  extractTextFromHtml, 
-  translateText, 
-  replaceTextInHtml 
+  translateHtmlContent 
 } from '@/services/translationService';
 import { LANGUAGES } from '@/lib/constants';
 import { TranslationStatus as TranslationStatusType } from '@/types/wordpress';
@@ -52,47 +50,31 @@ const Dashboard = () => {
       // Get language name for display
       const languageName = LANGUAGES.find(lang => lang.code === targetLanguage)?.name || targetLanguage;
       
-      // 2. Extract text from HTML
-      setTranslationStatus({
-        status: 'extracting',
-        message: 'Extracting content for translation...'
-      });
-      
-      const textChunks = extractTextFromHtml(page.content.rendered);
-      console.log(`Extracted ${textChunks.length} text chunks for translation`);
-      
-      if (textChunks.length === 0) {
-        throw new Error('No translatable content found on the page');
-      }
-      
-      // 3. Translate each chunk
+      // 2. Translate the entire HTML content
       setTranslationStatus({
         status: 'translating',
-        message: `Translating content to ${languageName}...`
+        message: `Analyzing and translating content to ${languageName}...`,
+        progress: 20
       });
       
-      const translatedChunks: string[] = [];
+      const translatedHtml = await translateHtmlContent(
+        page.content.rendered, 
+        languageName,
+        modelId,
+        (progress, stage) => {
+          setTranslationStatus({
+            status: 'translating',
+            message: stage,
+            progress: progress
+          });
+        }
+      );
       
-      for (let i = 0; i < textChunks.length; i++) {
-        const chunk = textChunks[i];
-        setTranslationStatus({
-          status: 'translating',
-          message: `Translating content to ${languageName} (${i + 1}/${textChunks.length})...`,
-          progress: Math.round(((i + 1) / textChunks.length) * 60) + 20 // 20-80% progress
-        });
-        
-        const translated = await translateText(chunk, languageName, modelId);
-        translatedChunks.push(translated);
-      }
-      
-      // 4. Replace text in HTML
-      const translatedHtml = replaceTextInHtml(page.content.rendered, textChunks, translatedChunks);
-      
-      // 5. Create new page
+      // 3. Create new page
       setTranslationStatus({
         status: 'creating',
         message: 'Creating translated page...',
-        progress: 80
+        progress: 90
       });
       
       const newPageData = {
@@ -113,7 +95,7 @@ const Dashboard = () => {
         throw new Error('Failed to create translated page');
       }
       
-      // 6. Success
+      // 4. Success
       setTranslationStatus({
         status: 'completed',
         message: `Translation completed! New page "${newPage.title.rendered}" created as a draft.`,
