@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -57,6 +58,8 @@ const Dashboard = () => {
         progress: 20
       });
       
+      console.log('Original HTML length:', page.content.rendered.length);
+      
       const translatedHtml = await translateHtmlContent(
         page.content.rendered, 
         languageName,
@@ -70,23 +73,26 @@ const Dashboard = () => {
         }
       );
       
-      // 3. Create new page
+      console.log('Translated HTML length:', translatedHtml.length);
+      
+      // 3. Create new page with exact same structure as original
       setTranslationStatus({
         status: 'creating',
         message: 'Creating translated page...',
         progress: 90
       });
       
+      // Copy all properties from the original page to preserve structure
       const newPageData = {
+        ...page,
+        id: undefined, // Don't include ID as we're creating a new page
         title: {
           rendered: `${page.title.rendered} - ${languageName}`
         },
         content: {
           rendered: translatedHtml
         },
-        status: 'draft',
-        template: page.template,
-        parent: page.parent
+        status: 'draft'
       };
       
       const newPage = await createPage(newPageData);

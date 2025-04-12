@@ -1,7 +1,7 @@
 
 import { GEMINI_API_KEY, GEMINI_API_URL } from '@/lib/constants';
 
-// Extract text content from HTML with tag context
+// Extract text content from HTML with tag context, including styled spans
 export const extractTextFromHtml = (html: string): Array<{text: string, path: string}> => {
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = html;
@@ -27,7 +27,45 @@ export const extractTextFromHtml = (html: string): Array<{text: string, path: st
         return;
       }
       
-      // Process child nodes
+      // Special handling for headings, paragraphs, and other text-containing elements
+      // that might have styled spans inside them
+      const isTextContainer = /^(h[1-6]|p|div|span|a|li|td|th|label|button)$/i.test(tagName);
+      
+      // For Elementor and other page builders that use nested spans with styles
+      if (isTextContainer && element.childNodes.length > 0) {
+        // Check if it's a container with both text and styled spans (mixed content)
+        let hasDirectTextAndElements = false;
+        let directTextContent = '';
+        
+        // Collect all direct text nodes first
+        Array.from(element.childNodes).forEach(child => {
+          if (child.nodeType === Node.TEXT_NODE) {
+            const text = child.textContent?.trim();
+            if (text && text.length > 0) {
+              directTextContent += text + ' ';
+              hasDirectTextAndElements = true;
+            }
+          } else if (child.nodeType === Node.ELEMENT_NODE) {
+            hasDirectTextAndElements = true;
+          }
+        });
+        
+        // If we have mixed content, treat the entire element's text as a single unit
+        if (hasDirectTextAndElements && element.textContent && element.textContent.trim().length > 0) {
+          const fullText = element.textContent.trim().replace(/\s+/g, ' ');
+          if (fullText.length > 1 && !/^\d+$/.test(fullText)) {
+            textNodes.push({
+              text: fullText,
+              path: newPath
+            });
+            
+            // Skip further processing of children for this mixed element
+            return;
+          }
+        }
+      }
+      
+      // Process child nodes if we didn't handle this as a mixed content container
       Array.from(node.childNodes).forEach(child => {
         processNode(child, newPath);
       });
@@ -62,15 +100,22 @@ export const prepareHtmlForTranslation = (html: string): {
   const textMap = new Map<string, {text: string, path: string}>();
   let preparedHtml = html;
   
+  // Sort text nodes by length in descending order to avoid partial replacements
+  const sortedTextNodes = [...textNodes].sort((a, b) => b.text.length - a.text.length);
+  
   // Create placeholders for each text node
-  textNodes.forEach((node, index) => {
+  sortedTextNodes.forEach((node, index) => {
     const placeholder = `__TRANSLATE_PLACEHOLDER_${index}__`;
     textMap.set(placeholder, node);
     
+    // Special handling for HTML inside content
     // Escape special characters for regex replacement
     const escapedText = node.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`(>\\s*|\\s+)(${escapedText})(\\s*<|\\s+)`, 'g');
-    preparedHtml = preparedHtml.replace(regex, `$1${placeholder}$3`);
+    
+    // Create a regex that works for both standalone text and text inside other elements
+    // This is important for catching text within styled spans
+    const regex = new RegExp(escapedText, 'g');
+    preparedHtml = preparedHtml.replace(regex, placeholder);
   });
   
   return { preparedHtml, textMap };
@@ -84,7 +129,12 @@ export const translateText = async (
 ): Promise<string> => {
   try {
     // Create a clear and explicit translation prompt
-    const prompt = `Translate the following text into ${targetLanguage} language. Preserve the tone, style and formatting of the original text. Only return the translated text without any explanations or additional content:\n\n${text}`;
+    const prompt = `Translate the following text into ${targetLanguage} language. 
+    Preserve formatting, styling and special characters. 
+    Maintain any HTML entities or special characters that might be present. 
+    Only return the translated text without any explanations or additional content.
+    
+    Text to translate: "${text}"`;
     
     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
@@ -100,7 +150,12 @@ export const translateText = async (
               }
             ]
           }
-        ]
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          topP: 0.8,
+          topK: 40
+        }
       })
     });
 
@@ -126,7 +181,7 @@ export const translateText = async (
   }
 };
 
-// Group texts for efficient translation
+// Group texts for efficient translation - using smaller chunks for better accuracy
 export const groupTextsForTranslation = (
   textMap: Map<string, {text: string, path: string}>
 ): Array<{
@@ -141,10 +196,17 @@ export const groupTextsForTranslation = (
   let currentChunk = '';
   let currentPlaceholders: string[] = [];
   
-  // Iterate through all texts and group them into chunks
+  // Process texts one by one - don't group longer texts to ensure accurate translations
   for (const [placeholder, node] of textMap.entries()) {
+    // If this text is long, send it individually
+    if (node.text.length > 300) {
+      chunks.push({
+        chunk: node.text,
+        placeholders: [placeholder]
+      });
+    }
     // If adding this text would exceed our chunk size, add current chunk to results
-    if (currentChunk.length + node.text.length > 450) { // Smaller size to ensure we stay under limits
+    else if (currentChunk.length + node.text.length > 300) { // Smaller chunks for better accuracy
       if (currentChunk.length > 0) {
         chunks.push({
           chunk: currentChunk,
@@ -208,8 +270,11 @@ export const translateHtmlContent = async (
       return html;
     }
     
+    console.log('Found text nodes for translation:', textMap.size);
+    
     // Step 2: Group texts for efficient translation
     const textChunks = groupTextsForTranslation(textMap);
+    console.log('Grouped into chunks:', textChunks.length);
     
     // Step 3: Translate each chunk
     const translatedTexts = new Map<string, string>();
@@ -220,6 +285,8 @@ export const translateHtmlContent = async (
         10 + Math.floor((completedChunks / textChunks.length) * 80),
         `Translating content (${completedChunks + 1}/${textChunks.length})`
       );
+      
+      console.log(`Translating chunk ${completedChunks + 1}/${textChunks.length}, length: ${chunk.chunk.length}`);
       
       // Translate the chunk
       const translatedChunk = await translateText(chunk.chunk, targetLanguage, modelId);
