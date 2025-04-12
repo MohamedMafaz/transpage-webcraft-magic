@@ -1,5 +1,5 @@
 
-import { OPENROUTER_API_KEY, OPENROUTER_API_URL } from '@/lib/constants';
+import { GEMINI_API_KEY, GEMINI_API_URL } from '@/lib/constants';
 
 // Extract text content from HTML
 export const extractTextFromHtml = (html: string): string[] => {
@@ -31,12 +31,12 @@ export const extractTextFromHtml = (html: string): string[] => {
     }
   }
   
-  // Group text into chunks of ~1000 characters
+  // Group text into chunks of ~500 characters (Gemini has smaller token limits)
   const chunks: string[] = [];
   let currentChunk = '';
   
   textNodes.forEach(text => {
-    if (currentChunk.length + text.length > 1000) {
+    if (currentChunk.length + text.length > 500) {
       chunks.push(currentChunk);
       currentChunk = text;
     } else {
@@ -51,33 +51,26 @@ export const extractTextFromHtml = (html: string): string[] => {
   return chunks;
 };
 
-// Translate text using OpenRouter API
+// Translate text using Google Gemini API
 export const translateText = async (
   text: string,
   targetLanguage: string,
-  modelId: string = 'gpt-3.5-turbo'
+  modelId: string = 'gemini-2.0-flash'
 ): Promise<string> => {
   try {
-    const response = await fetch(OPENROUTER_API_URL, {
+    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'WordPress Translation App'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: modelId,
-        messages: [
+        contents: [
           {
-            role: 'system',
-            content: `You are a professional translator. Translate the following text into ${targetLanguage}. 
-                      Preserve the tone, style and formatting of the original text. 
-                      Only respond with the translated text, without any explanations, notes, or additional content.`
-          },
-          {
-            role: 'user',
-            content: text
+            parts: [
+              {
+                text: `Translate the following text into ${targetLanguage}. Preserve the tone, style and formatting of the original text. Only respond with the translated text, without any explanations, notes, or additional content:\n\n${text}`
+              }
+            ]
           }
         ]
       })
@@ -89,7 +82,16 @@ export const translateText = async (
     }
 
     const data = await response.json();
-    return data.choices[0].message.content.trim();
+    
+    // Extract the translated text from Gemini response
+    if (data.candidates && data.candidates.length > 0 && 
+        data.candidates[0].content && 
+        data.candidates[0].content.parts && 
+        data.candidates[0].content.parts.length > 0) {
+      return data.candidates[0].content.parts[0].text.trim();
+    } else {
+      throw new Error('Unexpected response format from translation API');
+    }
   } catch (error) {
     console.error('Translation error:', error);
     throw new Error(error instanceof Error ? error.message : 'Translation failed');
