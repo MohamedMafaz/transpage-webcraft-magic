@@ -99,7 +99,9 @@ const Dashboard = () => {
         title: {
           rendered: `${page.title.rendered} - ${languageName}`
         },
-        content: translatedHtml,
+        content: {
+          rendered: translatedHtml
+        },
         status: 'draft',
         template: page.template,
         parent: page.parent

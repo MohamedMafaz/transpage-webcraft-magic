@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { WordPressCredentials, WordPressPage } from '@/types/wordpress';
 
@@ -137,10 +138,11 @@ export const useWordPress = () => {
     try {
       const authString = btoa(`${credentials.username}:${credentials.appPassword}`);
       
-      // Convert the title object to what WordPress API expects if it exists
+      // Format the page data for the WordPress API
       const formattedPageData = {
         ...pageData,
-        title: pageData.title?.rendered || ''
+        title: pageData.title?.rendered || '',
+        content: pageData.content?.rendered || ''
       };
       
       const response = await fetch(`${credentials.siteUrl}wp-json/wp/v2/pages`, {
