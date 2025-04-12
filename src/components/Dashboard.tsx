@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -97,7 +96,9 @@ const Dashboard = () => {
       });
       
       const newPageData = {
-        title: `${page.title.rendered} - ${languageName}`,
+        title: {
+          rendered: `${page.title.rendered} - ${languageName}`
+        },
         content: translatedHtml,
         status: 'draft',
         template: page.template,
