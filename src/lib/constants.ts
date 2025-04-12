@@ -15,7 +15,8 @@ export const LANGUAGES = [
   { code: "pl", name: "Polish" },
   { code: "sv", name: "Swedish" },
   { code: "tr", name: "Turkish" },
-  { code: "hi", name: "Hindi" }
+  { code: "hi", name: "Hindi" },
+  { code: "ta", name: "Tamil" }
 ];
 
 // Google Gemini API key and endpoint

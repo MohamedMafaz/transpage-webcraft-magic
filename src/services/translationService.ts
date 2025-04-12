@@ -58,6 +58,9 @@ export const translateText = async (
   modelId: string = 'gemini-2.0-flash'
 ): Promise<string> => {
   try {
+    // Ensure the API understands the language code
+    const prompt = `Translate the following text into ${targetLanguage} language. Preserve the tone, style and formatting of the original text. Only return the translated text without any explanations or additional content:\n\n${text}`;
+    
     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
@@ -68,7 +71,7 @@ export const translateText = async (
           {
             parts: [
               {
-                text: `Translate the following text into ${targetLanguage}. Preserve the tone, style and formatting of the original text. Only respond with the translated text, without any explanations, notes, or additional content:\n\n${text}`
+                text: prompt
               }
             ]
           }
