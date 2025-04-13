@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { WordPressCredentials, WordPressPage } from '@/types/wordpress';
 
@@ -126,7 +125,7 @@ export const useWordPress = () => {
   };
 
   // Create a new page on the WordPress site
-  const createPage = async (pageData: Partial<WordPressPage>): Promise<WordPressPage | null> => {
+  const createPage = async (pageData: Partial<any>): Promise<WordPressPage | null> => {
     if (!credentials || !isAuthenticated) {
       setError('Not authenticated');
       return null;
@@ -138,10 +137,10 @@ export const useWordPress = () => {
     try {
       const authString = btoa(`${credentials.username}:${credentials.appPassword}`);
       
-      console.log('Creating new page with Elementor data structure preserved');
+      console.log('Creating new page with data:', JSON.stringify(pageData, null, 2));
       
-      // Prepare data for WordPress API while preserving Elementor structure
-      // Important: Don't modify the content structure
+      // Send the page data directly to WordPress API
+      // This preserves all the original structure and metadata
       const response = await fetch(`${credentials.siteUrl}wp-json/wp/v2/pages`, {
         method: 'POST',
         headers: {
@@ -161,7 +160,7 @@ export const useWordPress = () => {
       }
       
       const newPage = await response.json();
-      console.log('New page created successfully with Elementor structure preserved');
+      console.log('New page created successfully:', newPage);
       
       // Refresh the pages list
       await fetchPages();
