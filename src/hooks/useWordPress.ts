@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { WordPressCredentials, WordPressPage } from '@/types/wordpress';
 
@@ -126,7 +125,7 @@ export const useWordPress = () => {
   };
 
   // Create a new page on the WordPress site
-  const createPage = async (pageData: Partial<WordPressPage>): Promise<WordPressPage | null> => {
+  const createPage = async (pageData: Partial<any>): Promise<WordPressPage | null> => {
     if (!credentials || !isAuthenticated) {
       setError('Not authenticated');
       return null;
@@ -138,20 +137,17 @@ export const useWordPress = () => {
     try {
       const authString = btoa(`${credentials.username}:${credentials.appPassword}`);
       
-      // Format the page data for the WordPress API
-      const formattedPageData = {
-        ...pageData,
-        title: pageData.title?.rendered || '',
-        content: pageData.content?.rendered || ''
-      };
+      console.log('Creating new page with data:', JSON.stringify(pageData, null, 2));
       
+      // Send the page data directly to WordPress API
+      // This preserves all the original structure and metadata
       const response = await fetch(`${credentials.siteUrl}wp-json/wp/v2/pages`, {
         method: 'POST',
         headers: {
           'Authorization': `Basic ${authString}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formattedPageData)
+        body: JSON.stringify(pageData)
       });
       
       if (!response.ok) {
@@ -164,6 +160,7 @@ export const useWordPress = () => {
       }
       
       const newPage = await response.json();
+      console.log('New page created successfully:', newPage);
       
       // Refresh the pages list
       await fetchPages();

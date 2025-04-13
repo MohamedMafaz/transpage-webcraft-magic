@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -82,17 +81,19 @@ const Dashboard = () => {
         progress: 90
       });
       
-      // Copy all properties from the original page to preserve structure
+      // Preserve ALL original page data except content and title
       const newPageData = {
-        ...page,
-        id: undefined, // Don't include ID as we're creating a new page
-        title: {
-          rendered: `${page.title.rendered} - ${languageName}`
-        },
-        content: {
-          rendered: translatedHtml
-        },
-        status: 'draft'
+        title: `${page.title.rendered} - ${languageName}`,
+        content: translatedHtml,
+        status: 'draft',
+        template: page.template,
+        parent: page.parent,
+        menu_order: page.menu_order,
+        comment_status: page.comment_status,
+        ping_status: page.ping_status,
+        meta: page.meta,
+        // Include any other important page properties
+        slug: `${page.slug}-${targetLanguage.toLowerCase()}`
       };
       
       const newPage = await createPage(newPageData);
