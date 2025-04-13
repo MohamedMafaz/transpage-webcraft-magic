@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -6,7 +7,7 @@ import { useWordPress } from '@/hooks/useWordPress';
 import { 
   translateHtmlContent 
 } from '@/services/translationService';
-import { LANGUAGES } from '@/lib/constants';
+import { LANGUAGES, TRANSLATION_MODELS, DEFAULT_MODEL } from '@/lib/constants';
 import { TranslationStatus as TranslationStatusType } from '@/types/wordpress';
 import AuthForm from './AuthForm';
 import PageSelector from './PageSelector';
@@ -81,8 +82,9 @@ const Dashboard = () => {
         progress: 90
       });
       
-      // Preserve ALL original page data except content and title
+      // Create a new page data object that maintains ALL Elementor specific fields and meta
       const newPageData = {
+        // Base properties
         title: `${page.title.rendered} - ${languageName}`,
         content: translatedHtml,
         status: 'draft',
@@ -92,9 +94,29 @@ const Dashboard = () => {
         comment_status: page.comment_status,
         ping_status: page.ping_status,
         meta: page.meta,
-        // Include any other important page properties
-        slug: `${page.slug}-${targetLanguage.toLowerCase()}`
+        slug: `${page.slug}-${targetLanguage.toLowerCase()}`,
+        
+        // Copy ALL Elementor-specific fields - these are critical for preserving structure
+        _elementor_edit_mode: page._elementor_edit_mode,
+        _elementor_template_type: page._elementor_template_type,
+        _elementor_version: page._elementor_version,
+        _elementor_data: page._elementor_data,
+        _elementor_page_settings: page._elementor_page_settings
       };
+      
+      // Now add any other custom fields that might exist on the page object
+      // This ensures we don't miss any important fields specific to this Elementor setup
+      for (const key in page) {
+        if (
+          key.startsWith('_') && 
+          !key.startsWith('_links') && 
+          !newPageData.hasOwnProperty(key)
+        ) {
+          newPageData[key] = page[key];
+        }
+      }
+      
+      console.log('Creating new page with complete Elementor structure');
       
       const newPage = await createPage(newPageData);
       
@@ -105,13 +127,13 @@ const Dashboard = () => {
       // 4. Success
       setTranslationStatus({
         status: 'completed',
-        message: `Translation completed! New page "${newPage.title.rendered}" created as a draft.`,
+        message: `Translation completed! New page "${newPage.title.rendered}" created as a draft with all Elementor structure preserved.`,
         progress: 100
       });
       
       toast({
         title: "Translation Completed",
-        description: `The page "${page.title.rendered}" has been translated to ${languageName}.`,
+        description: `The page "${page.title.rendered}" has been translated to ${languageName} with full Elementor structure.`,
       });
       
     } catch (err) {
